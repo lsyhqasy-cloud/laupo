@@ -17,26 +17,6 @@ session_string = os.getenv("SESSION_STRING")
 default_chat_id = os.getenv("CHAT_ID")
 
 CONCURRENCY = 20
-
-async def extractWormGPT(query: str):
-    query = query.strip()
-    response_future = asyncio.get_event_loop().create_future()
-    target_chat = "@znalahskwkakskwonsoakaljkdekek"
-
-    async with Client("wormgpt_session", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
-
-        @app.on_edited_message(filters.chat("WormGPT2Bot") & filters.bot)
-        async def handle_edited(client, message):
-            if not response_future.done() and message.text and message.text.strip() != query:
-                forwarded = await message.forward(target_chat)
-                response_future.set_result(forwarded.id)
-
-        await app.send_message("WormGPT2Bot", query)
-        forwarded_message_id = await response_future
-    return forwarded_message_id
-
-__all__ = ["extractWormGPT"]
-
 async def process_username(username):
     async with Client("fast_approver", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
         try:
@@ -146,10 +126,4 @@ async def _cli(query: str):
 
 # ------------------ Main ------------------
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        # CLI mode
-        query = " ".join(sys.argv[1:])
-        asyncio.run(_cli(query))
-    else:
-        # Flask mode
         app.run(host="0.0.0.0", port=3000, debug=True)
