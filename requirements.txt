@@ -1,0 +1,9 @@
+dotenv
+pyrogram
+flask
+tgcrypto
+terabox-downloader
+aiohttp
+aiodns
+requests
+telethon
