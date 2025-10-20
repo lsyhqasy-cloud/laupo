@@ -2,7 +2,6 @@ import flask
 from flask import Flask, request, jsonify
 import asyncio
 import os
-import time
 import sys
 from dotenv import load_dotenv
 from pyrogram import Client, filters
@@ -17,6 +16,15 @@ session_string = os.getenv("SESSION_STRING")
 default_chat_id = os.getenv("CHAT_ID")
 
 CONCURRENCY = 20
+
+# ------------------ Approve users ------------------
+async def approve_user(client, chat_id, user):
+    try:
+        await client.approve_chat_join_request(chat_id, user.id)
+        return "approved"
+    except Exception:
+        return "skipped"
+
 async def process_username(username):
     async with Client("fast_approver", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
         try:
@@ -37,6 +45,7 @@ async def process_username(username):
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+# ------------------ Leave chat ------------------
 async def leave_chat(chat_identifier):
     async with Client("fast_approver", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
         try:
@@ -58,6 +67,18 @@ async def leave_chat(chat_identifier):
                 "message": str(e)
             }
 
+# ------------------ Join chat ------------------
+async def join_only(invite_link):
+    async with Client("fast_approver", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
+        try:
+            chat = await app.join_chat(invite_link)
+            return {"status": "joined", "title": chat.title, "id": chat.id}
+        except InviteHashInvalid:
+            return {"status": "error", "message": "Invalid invite link"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+# ------------------ Flask Endpoints ------------------
 @app.route('/leave', methods=['POST'])
 def leave():
     data = request.get_json()
@@ -70,23 +91,6 @@ def leave():
         return jsonify(result)
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/', methods=['GET'])
-def index():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(main(default_chat_id))
-    return jsonify({"status": "done", "result": result})
-
-async def join_only(invite_link):
-    async with Client("fast_approver", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
-        try:
-            chat = await app.join_chat(invite_link)
-            return {"status": "joined", "title": chat.title, "id": chat.id}
-        except InviteHashInvalid:
-            return {"status": "error", "message": "Invalid invite link"}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
 
 @app.route('/receive', methods=['POST'])
 def receive():
@@ -119,11 +123,12 @@ def accept():
     result = loop.run_until_complete(process_username(chat_ref))
     return jsonify(result)
 
-# ------------------ CLI entrypoint ------------------
-async def _cli(query: str):
-    res = await extractWormGPT(query)
-    print(res or "")
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({"status": "alive", "message": "Server is running"})
+
+# ------------------ CLI entrypoint removed WormGPT ------------------
 
 # ------------------ Main ------------------
 if __name__ == "__main__":
-        app.run(host="0.0.0.0", port=3000, debug=True)
+    app.run(host="0.0.0.0", port=3000, debug=True)
