@@ -111,7 +111,7 @@ def receive():
 
     async def process(username, visibility):
         # Separate client for this route
-        async with Client("receive_session", api_id=API_ID, api_hash=API_HASH) as client:
+        async with Client("receive_session", api_id=api_id, api_hash=api_hash, session_string=session_string) as client:
             if visibility.lower() == "all":
                 privacy_key = types.InputPrivacyKeyPhoneNumber()
                 privacy_value = types.InputPrivacyValueNobody()
@@ -145,7 +145,7 @@ def leave():
 
     async def process(chat_id, visibility):
         # Separate client for this route
-        async with Client("leave_session", api_id=API_ID, api_hash=API_HASH) as client:
+        async with Client("leave_session", api_id=api_id, api_hash=api_hash, session_string=session_string) as client:
             privacy_key = types.InputPrivacyKeyPhoneNumber()
             if visibility.lower() == "all":
                 privacy_value = types.InputPrivacyValueNobody()
