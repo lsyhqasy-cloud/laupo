@@ -14,7 +14,7 @@ from pyrogram.errors import (
     InviteHashInvalid
 )
 from pyrogram.raw.functions.account import SetPrivacy
-from pyrogram.raw.types import InputPrivacyKeyPhoneNumber, InputPrivacyValueNobody, InputPrivacyValueAllowContacts
+from pyrogram.raw import types
 
 app = Flask(__name__)
 
