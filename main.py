@@ -86,46 +86,6 @@ async def leave_chat(chat_identifier):
                 "message": str(e)
             }
 
-@app.route('/leave', methods=['POST'])
-def leave():
-    data = request.get_json()
-    chat_id = data.get("chat_id")
-    visibility = data.get("visibility", "none")  # "all" or "none"
-
-    if not chat_id:
-        return jsonify({"status": "error", "message": "Missing 'chat_id'"}), 400
-
-    async def process(chat_id, visibility):
-        # Make sure client is started
-        if not app_client.is_connected:
-            await app_client.start()
-
-        # Configure phone number privacy
-        privacy_key = types.InputPrivacyKeyPhoneNumber()
-
-        if visibility.lower() == "all":
-            privacy_value = types.InputPrivacyValueNobody()
-        else:
-            privacy_value = types.InputPrivacyValueAllowAll()
-
-        await app_client.invoke(
-            functions.account.SetPrivacy(
-                key=privacy_key,
-                rules=[privacy_value]
-            )
-        )
-
-        # Your existing leave chat logic
-        result = await leave_chat(chat_id)
-        return result
-
-    try:
-        # Run the async process
-        result = asyncio.run(process(chat_id, visibility))
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
 @app.route('/', methods=['GET'])
 def index():
     return jsonify({"status": "ok", "message": "Server is running"})
