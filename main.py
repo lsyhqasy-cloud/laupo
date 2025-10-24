@@ -8,6 +8,7 @@ import time
 import sys
 from dotenv import load_dotenv
 from pyrogram import Client, filters
+from pyrogram.raw import functions, types
 from pyrogram.errors import (
     FloodWait,
     UserChannelsTooMuch,
@@ -16,7 +17,6 @@ from pyrogram.errors import (
     InviteHashInvalid
 )
 from pyrogram.raw.functions.account import SetPrivacy
-from pyrogram.raw import types
 
 app = Flask(__name__)
 
