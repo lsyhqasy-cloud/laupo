@@ -118,7 +118,7 @@ def receive():
                 await client.invoke(
                     functions.account.SetPrivacy(
                         key=types.InputPrivacyKeyPhoneNumber(),
-                        rules=[types.InputPrivacyValueNobody()]
+                        rules=[types.InputPrivacyValueDisallowAll()]
                     )
                 )
             # Continue with your normal join logic
@@ -147,7 +147,7 @@ def leave():
         async with Client("leave_session", api_id=api_id, api_hash=api_hash, session_string=session_string) as client:
             privacy_key = types.InputPrivacyKeyPhoneNumber()
             if visibility.lower() == "all":
-                privacy_value = types.InputPrivacyValueNobody()
+                privacy_value = types.InputPrivacyValueDisallowAll()
             else:
                 privacy_value = types.InputPrivacyValueAllowAll()
 
