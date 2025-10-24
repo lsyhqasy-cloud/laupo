@@ -131,10 +131,7 @@ def leave():
 
 @app.route('/', methods=['GET'])
 def index():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(main(default_chat_id))
-    return jsonify({"status": "done", "result": result})
+    return jsonify({"status": "ok", "message": "Server is running"})
 
 async def join_only(invite_link):
     async with Client("fast_approver", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
