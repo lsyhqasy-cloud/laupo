@@ -7,3 +7,4 @@ aiohttp
 aiodns
 requests
 telethon
+nest_asyncio
