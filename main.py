@@ -1,6 +1,8 @@
 import flask
 from flask import Flask, request, jsonify
 import asyncio
+import nest_asyncio
+nest_asyncio.apply()
 import os
 import time
 import sys
@@ -158,11 +160,6 @@ def leave():
 
             result = await leave_chat(chat_id)
             return result
-
-    import nest_asyncio
-    nest_asyncio.apply()
-    import asyncio
-
     try:
         result = asyncio.run(process(chat_id, visibility))
         return jsonify(result)
