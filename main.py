@@ -104,32 +104,29 @@ async def join_only(invite_link):
 def receive():
     data = request.get_json()
     username = data.get("username")
-    visibility = data.get("visibility", "none")
+    visibility = data.get("visibility")  # only if provided
 
     if not username:
         return jsonify({"status": "error", "message": "Missing 'username'"}), 400
 
     async def process(username, visibility):
-        # Separate client for this route
         async with Client("receive_session", api_id=api_id, api_hash=api_hash, session_string=session_string) as client:
-            if visibility.lower() == "all":
-                privacy_key = types.InputPrivacyKeyPhoneNumber()
-                privacy_value = types.InputPrivacyValueNobody()
+            # If visibility is "everyone", set phone to nobody
+            if visibility and visibility.lower() == "everyone":
                 await client.invoke(
                     functions.account.SetPrivacy(
-                        key=privacy_key,
-                        rules=[privacy_value]
+                        key=types.InputPrivacyKeyPhoneNumber(),
+                        rules=[types.InputPrivacyValueNobody()]
                     )
                 )
+            # Continue with your normal join logic
             result = await join_only(username)
             return result
 
-    import nest_asyncio
     nest_asyncio.apply()
-    import asyncio
-
+    loop = asyncio.get_event_loop()
     try:
-        result = asyncio.run(process(username, visibility))
+        result = loop.run_until_complete(process(username, visibility))
         return jsonify(result)
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
