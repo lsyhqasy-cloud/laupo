@@ -1,22 +1,12 @@
 import flask
 from flask import Flask, request, jsonify
 import asyncio
-import nest_asyncio
-nest_asyncio.apply()
 import os
 import time
 import sys
 from dotenv import load_dotenv
 from pyrogram import Client, filters
-from pyrogram.raw import functions, types
-from pyrogram.errors import (
-    FloodWait,
-    UserChannelsTooMuch,
-    UserDeactivated,
-    PeerIdInvalid,
-    InviteHashInvalid
-)
-from pyrogram.raw.functions.account import SetPrivacy
+from pyrogram.errors import FloodWait, UserChannelsTooMuch, UserDeactivated, PeerIdInvalid, InviteHashInvalid
 
 app = Flask(__name__)
 
@@ -88,9 +78,25 @@ async def leave_chat(chat_identifier):
                 "message": str(e)
             }
 
+@app.route('/leave', methods=['POST'])
+def leave():
+    data = request.get_json()
+    chat_id = data.get("chat_id")
+    if not chat_id:
+        return jsonify({"status": "error", "message": "Missing 'chat_id'"}), 400
+
+    try:
+        result = asyncio.run(leave_chat(chat_id))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/', methods=['GET'])
 def index():
-    return jsonify({"status": "ok", "message": "Server is running"})
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(main(default_chat_id))
+    return jsonify({"status": "done", "result": result})
 
 async def join_only(invite_link):
     async with Client("fast_approver", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
@@ -106,65 +112,13 @@ async def join_only(invite_link):
 def receive():
     data = request.get_json()
     username = data.get("username")
-    visibility = data.get("visibility")  # only if provided
-
+    visibility = data.get("visibility")
     if not username:
         return jsonify({"status": "error", "message": "Missing 'username'"}), 400
-
-    async def process(username, visibility):
-        async with Client("receive_session", api_id=api_id, api_hash=api_hash, session_string=session_string) as client:
-            # If visibility is "everyone", set phone to nobody
-            if visibility and visibility.lower() == "everyone":
-                await client.invoke(
-                    functions.account.SetPrivacy(
-                        key=types.InputPrivacyKeyPhoneNumber(),
-                        rules=[types.InputPrivacyValueDisallowAll()]
-                    )
-                )
-            # Continue with your normal join logic
-            result = await join_only(username)
-            return result
-
-    nest_asyncio.apply()
-    loop = asyncio.get_event_loop()
-    try:
-        result = loop.run_until_complete(process(username, visibility))
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/leave', methods=['POST'])
-def leave():
-    data = request.get_json()
-    chat_id = data.get("chat_id")
-    visibility = data.get("visibility", "none")
-
-    if not chat_id:
-        return jsonify({"status": "error", "message": "Missing 'chat_id'"}), 400
-
-    async def process(chat_id, visibility):
-        # Separate client for this route
-        async with Client("leave_session", api_id=api_id, api_hash=api_hash, session_string=session_string) as client:
-            privacy_key = types.InputPrivacyKeyPhoneNumber()
-            if visibility.lower() == "all":
-                privacy_value = types.InputPrivacyValueDisallowAll()
-            else:
-                privacy_value = types.InputPrivacyValueAllowAll()
-
-            await client.invoke(
-                functions.account.SetPrivacy(
-                    key=privacy_key,
-                    rules=[privacy_value]
-                )
-            )
-
-            result = await leave_chat(chat_id)
-            return result
-    try:
-        result = asyncio.run(process(chat_id, visibility))
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(join_only(username))
+    return jsonify(result)
 
 @app.route('/accept', methods=['POST'])
 def accept():
