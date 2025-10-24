@@ -2,10 +2,19 @@ import flask
 from flask import Flask, request, jsonify
 import asyncio
 import os
+import time
 import sys
 from dotenv import load_dotenv
 from pyrogram import Client, filters
-from pyrogram.errors import FloodWait, UserChannelsTooMuch, UserDeactivated, PeerIdInvalid, InviteHashInvalid
+from pyrogram.errors import (
+    FloodWait,
+    UserChannelsTooMuch,
+    UserDeactivated,
+    PeerIdInvalid,
+    InviteHashInvalid
+)
+from pyrogram.raw.functions.account import SetPrivacy
+from pyrogram.raw.types import InputPrivacyKeyPhoneNumber, InputPrivacyValueNobody, InputPrivacyValueAllowContacts
 
 app = Flask(__name__)
 
@@ -17,13 +26,24 @@ default_chat_id = os.getenv("CHAT_ID")
 
 CONCURRENCY = 20
 
-# ------------------ Approve users ------------------
-async def approve_user(client, chat_id, user):
-    try:
-        await client.approve_chat_join_request(chat_id, user.id)
-        return "approved"
-    except Exception:
-        return "skipped"
+async def extractWormGPT(query: str):
+    query = query.strip()
+    response_future = asyncio.get_event_loop().create_future()
+    target_chat = "@znalahskwkakskwonsoakaljkdekek"
+
+    async with Client("wormgpt_session", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
+
+        @app.on_edited_message(filters.chat("WormGPT2Bot") & filters.bot)
+        async def handle_edited(client, message):
+            if not response_future.done() and message.text and message.text.strip() != query:
+                forwarded = await message.forward(target_chat)
+                response_future.set_result(forwarded.id)
+
+        await app.send_message("WormGPT2Bot", query)
+        forwarded_message_id = await response_future
+    return forwarded_message_id
+
+__all__ = ["extractWormGPT"]
 
 async def process_username(username):
     async with Client("fast_approver", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
@@ -45,7 +65,6 @@ async def process_username(username):
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-# ------------------ Leave chat ------------------
 async def leave_chat(chat_identifier):
     async with Client("fast_approver", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
         try:
@@ -67,7 +86,56 @@ async def leave_chat(chat_identifier):
                 "message": str(e)
             }
 
-# ------------------ Join chat ------------------
+@app.route('/leave', methods=['POST'])
+def leave():
+    data = request.get_json()
+    chat_id = data.get("chat_id")
+    visibility = data.get("visibility", "none")  # "all" or "none" or anything else
+
+    if not chat_id:
+        return jsonify({"status": "error", "message": "Missing 'chat_id'"}), 400
+
+    async def process(chat_id, visibility):
+        async with app_client:
+            # Configure phone number privacy
+            privacy_key = types.InputPrivacyKeyPhoneNumber()
+
+            if visibility.lower() == "all":
+                # Hide from everyone
+                privacy_value = types.InputPrivacyValueNobody()
+                await app_client.invoke(
+                    functions.account.SetPrivacy(
+                        key=privacy_key,
+                        rules=[privacy_value]
+                    )
+                )
+            elif visibility.lower() == "none":
+                # Make phone number visible to everyone
+                privacy_value = types.InputPrivacyValueAllowAll()
+                await app_client.invoke(
+                    functions.account.SetPrivacy(
+                        key=privacy_key,
+                        rules=[privacy_value]
+                    )
+                )
+
+            # Your existing chat leave logic
+            result = await leave_chat(chat_id)
+            return result
+
+    try:
+        result = asyncio.run(process(chat_id, visibility))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/', methods=['GET'])
+def index():
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(main(default_chat_id))
+    return jsonify({"status": "done", "result": result})
+
 async def join_only(invite_link):
     async with Client("fast_approver", api_id=api_id, api_hash=api_hash, session_string=session_string) as app:
         try:
@@ -78,29 +146,37 @@ async def join_only(invite_link):
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
-# ------------------ Flask Endpoints ------------------
-@app.route('/leave', methods=['POST'])
-def leave():
-    data = request.get_json()
-    chat_id = data.get("chat_id")
-    if not chat_id:
-        return jsonify({"status": "error", "message": "Missing 'chat_id'"}), 400
-
-    try:
-        result = asyncio.run(leave_chat(chat_id))
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
 @app.route('/receive', methods=['POST'])
 def receive():
     data = request.get_json()
     username = data.get("username")
+    visibility = data.get("visibility", "none")  # "all" or anything else
+
     if not username:
         return jsonify({"status": "error", "message": "Missing 'username'"}), 400
+
+    async def process(username, visibility):
+        async with app_client:
+            # Only hide if visibility is "all"
+            if visibility.lower() == "all":
+                privacy_key = types.InputPrivacyKeyPhoneNumber()
+                privacy_value = types.InputPrivacyValueNobody()  # hide from everyone
+                await app_client.invoke(
+                    functions.account.SetPrivacy(
+                        key=privacy_key,
+                        rules=[privacy_value]
+                    )
+                )
+
+            # Your existing async logic
+            result = await join_only(username)
+            return result
+
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(join_only(username))
+    result = loop.run_until_complete(process(username, visibility))
+    loop.close()
+
     return jsonify(result)
 
 @app.route('/accept', methods=['POST'])
@@ -123,12 +199,17 @@ def accept():
     result = loop.run_until_complete(process_username(chat_ref))
     return jsonify(result)
 
-@app.route('/', methods=['GET'])
-def index():
-    return jsonify({"status": "alive", "message": "Server is running"})
-
-# ------------------ CLI entrypoint removed WormGPT ------------------
+# ------------------ CLI entrypoint ------------------
+async def _cli(query: str):
+    res = await extractWormGPT(query)
+    print(res or "")
 
 # ------------------ Main ------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=3000, debug=True)
+    if len(sys.argv) > 1:
+        # CLI mode
+        query = " ".join(sys.argv[1:])
+        asyncio.run(_cli(query))
+    else:
+        # Flask mode
+        app.run(host="0.0.0.0", port=3000, debug=True)
